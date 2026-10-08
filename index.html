@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Generator — генератор QR-кодов</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%2358a6ff'/%3E%3Cstop offset='100%25' stop-color='%23bc8cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='12' fill='url(%23g)'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial' font-size='28' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'%3EQR%3C/text%3E%3C/svg%3E">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:'Segoe UI',Arial,sans-serif;
+    background:linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1a1f2e 100%);
+    color:#e6edf3;
+    min-height:100vh;
+    padding:30px 20px;
+  }
+  .container { max-width:800px; margin:0 auto; }
+  h1 {
+    font-size:42px;
+    letter-spacing:3px;
+    text-align:center;
+    background:linear-gradient(90deg, #58a6ff, #bc8cff, #ff7b72);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    margin-bottom:8px;
+  }
+  .subtitle { text-align:center; color:#8b949e; font-size:14px; margin-bottom:30px; }
+
+  .card {
+    background:rgba(22,27,34,.85);
+    border:1px solid #30363d;
+    border-radius:16px;
+    padding:24px;
+    margin-bottom:20px;
+    backdrop-filter:blur(20px);
+  }
+
+  label {
+    display:block;
+    color:#8b949e;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin-bottom:8px;
+    font-weight:600;
+  }
+  textarea, select {
+    width:100%;
+    padding:14px 18px;
+    background:#0d1117;
+    border:1px solid #30363d;
+    border-radius:10px;
+    color:#e6edf3;
+    font-size:15px;
+    outline:none;
+    font-family:inherit;
+    margin-bottom:16px;
+  }
+  textarea:focus, select:focus { border-color:#58a6ff; }
+  textarea { min-height:100px; resize:vertical; line-height:1.5; }
+
+  .options {
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:12px;
+  }
+
+  .btn {
+    width:100%;
+    padding:16px;
+    background:linear-gradient(135deg, #58a6ff, #bc8cff);
+    border:none;
+    border-radius:12px;
+    color:#fff;
+    font-size:16px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.2s;
+    font-family:inherit;
+  }
+  .btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 20px rgba(88,166,255,.3); }
+  .btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+  .result-card {
+    background:rgba(22,27,34,.85);
+    border:1px solid #30363d;
+    border-radius:16px;
+    padding:30px;
+    backdrop-filter:blur(20px);
+    text-align:center;
+    display:none;
+  }
+  .result-card.show { display:block; animation:fadeIn .4s ease; }
+
+  @keyframes fadeIn {
+    from { opacity:0; transform:scale(.95); }
+    to { opacity:1; transform:scale(1); }
+  }
+
+  .qr-preview {
+    display:inline-block;
+    background:#fff;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);
+    min-height:100px;
+    min-width:100px;
+  }
+  #qrCanvas {
+    display:block;
+    max-width:100%;
+    image-rendering: pixelated;
+  }
+
+  .downloads {
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:10px;
+  }
+  .download-btn {
+    padding:16px;
+    background:#21262d;
+    border:1px solid #30363d;
+    border-radius:12px;
+    color:#e6edf3;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.2s;
+    font-family:inherit;
+  }
+  .download-btn:hover { border-color:#58a6ff; color:#58a6ff; transform:translateY(-2px); }
+
+  .status {
+    color:#8b949e;
+    font-size:13px;
+    text-align:center;
+    margin-top:16px;
+    min-height:20px;
+  }
+  .status.error { color:#f85149; }
+  .status.success { color:#3fb950; }
+
+  .footer { text-align:center; color:#484f58; font-size:12px; margin-top:30px; }
+
+  @media (max-width:600px) {
+    h1 { font-size:28px; }
+    .options { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔗 QR Generator</h1>
+    <p class="subtitle">Вставь ссылку — получи QR-код</p>
+
+    <div class="card">
+      <label>Ссылка или текст</label>
+      <textarea id="qrText" placeholder="https://anygen.onrender.com или любой текст..." maxlength="2000"></textarea>
+
+      <div class="options">
+        <div>
+          <label>Размер</label>
+          <select id="qrSize">
+            <option value="256">256 × 256</option>
+            <option value="512" selected>512 × 512</option>
+            <option value="1024">1024 × 1024</option>
+            <option value="2048">2048 × 2048</option>
+          </select>
+        </div>
+        <div>
+          <label>Цвет</label>
+          <select id="qrColor">
+            <option value="#000000" selected>⚫ Чёрный</option>
+            <option value="#58a6ff">🔵 Синий</option>
+            <option value="#bc8cff">🟣 Фиолетовый</option>
+            <option value="#3fb950">🟢 Зелёный</option>
+            <option value="#f85149">🔴 Красный</option>
+          </select>
+        </div>
+        <div>
+          <label>Фон</label>
+          <select id="qrBg">
+            <option value="#ffffff" selected>⚪ Белый</option>
+            <option value="#f0f0f0">🩶 Светло-серый</option>
+            <option value="#ffffcc">🟡 Кремовый</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn" id="genBtn" onclick="generate()">🎨 Сгенерировать QR-код</button>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="result-card" id="resultCard">
+      <div class="qr-preview">
+        <canvas id="qrCanvas"></canvas>
+      </div>
+
+      <div class="downloads">
+        <button class="download-btn" onclick="download('png')">📥 PNG</button>
+        <button class="download-btn" onclick="download('jpeg')">📥 JPEG</button>
+        <button class="download-btn" onclick="download('webp')">📥 WEBP</button>
+      </div>
+    </div>
+
+    <div class="footer">QR Generator · 2026</div>
+  </div>
+
+<script>
+function setStatus(text, type) {
+  var el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+function generate() {
+  var text = document.getElementById('qrText').value.trim();
+  if (!text) {
+    setStatus('⚠️ Вставь ссылку или текст!', 'error');
+    return;
+  }
+
+  var size = parseInt(document.getElementById('qrSize').value);
+  var color = document.getElementById('qrColor').value.replace('#', '');
+  var bg = document.getElementById('qrBg').value.replace('#', '');
+
+  var btn = document.getElementById('genBtn');
+  btn.disabled = true;
+  setStatus('⏳ Генерирую...');
+
+  // ==== API QR Server ====
+  var apiUrl = 'https://api.qrserver.com/v1/create-qr-code/?' +
+    'size=' + size + 'x' + size +
+    '&data=' + encodeURIComponent(text) +
+    '&color=' + color +
+    '&bgcolor=' + bg +
+    '&margin=10' +
+    '&format=png';
+
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+
+  img.onload = function() {
+    var canvas = document.getElementById('qrCanvas');
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, size, size);
+
+    document.getElementById('resultCard').classList.add('show');
+    document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
+    setStatus('✅ QR-код готов!', 'success');
+    btn.disabled = false;
+  };
+
+  img.onerror = function() {
+    setStatus('❌ Не удалось сгенерировать. Проверь интернет.', 'error');
+    btn.disabled = false;
+  };
+
+  img.src = apiUrl;
+}
+
+function download(format) {
+  var canvas = document.getElementById('qrCanvas');
+
+  if (!canvas.width || !canvas.height) {
+    setStatus('⚠️ Сначала сгенерируй QR-код', 'error');
+    return;
+  }
+
+  var filename = 'qrcode_' + Date.now() + '.' + format;
+  var mime = 'image/' + format;
+  if (format === 'jpeg') mime = 'image/jpeg';
+
+  try {
+    var dataURL = canvas.toDataURL(mime, 0.95);
+    var link = document.createElement('a');
+    link.download = filename;
+    link.href = dataURL;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (e) {
+    setStatus('❌ Ошибка скачивания: ' + e.message, 'error');
+  }
+}
+
+// Enter для генерации
+document.getElementById('qrText').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    generate();
+  }
+});
+</script>
+</body>
+</html>
